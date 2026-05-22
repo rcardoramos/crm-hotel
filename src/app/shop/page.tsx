@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import {
   ShoppingBag,
-  Search,
   Sparkles,
   Coffee,
   Wine,
@@ -43,7 +42,6 @@ const getProductImage = (name: string, category: string) => {
 export default function ShopPage() {
   const { products } = useApp();
   
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Category mapping
@@ -58,9 +56,7 @@ export default function ShopPage() {
 
   // Filter products
   const filteredProducts = products.filter((prod) => {
-    const matchesSearch = prod.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || prod.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return selectedCategory === 'all' || prod.category === selectedCategory;
   });
 
   return (
@@ -87,21 +83,10 @@ export default function ShopPage() {
       <section className="max-w-6xl mx-auto px-6 py-10 w-full flex-1">
         
         <div className="space-y-6">
-          {/* Search and Filters Bar */}
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar producto o plato..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-xs pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-slate-700 font-semibold"
-              />
-            </div>
-            
+          {/* Categories Bar */}
+          <div className="flex justify-center items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
             {/* Category tabs */}
-            <div className="flex gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none justify-center">
               {categories.map((cat) => {
                 const isActive = selectedCategory === cat.id;
                 return (
