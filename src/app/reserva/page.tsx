@@ -311,7 +311,7 @@ export default function PublicBookingPage() {
 
                 {/* Info Banner showing check-out time calculated */}
                 <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-2xl flex items-center space-x-2.5">
-                  <Clock className="h-4 w-4 text-indigo-650 shrink-0" />
+                  <Clock className="h-4 w-4 text-indigo-600 shrink-0" />
                   <p className="text-[10px] text-indigo-950 leading-normal">
                     <strong>Salida estimada:</strong> {calculatedCheckOutDate.split('-').reverse().join('/')} a las {calculatedCheckOutTime}
                   </p>
@@ -383,7 +383,7 @@ export default function PublicBookingPage() {
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setBookingStep('details')}
-                className="text-xs text-indigo-650 hover:underline font-semibold"
+                className="text-xs text-indigo-600 hover:underline font-semibold"
               >
                 Atrás
               </button>
@@ -435,7 +435,7 @@ export default function PublicBookingPage() {
               </div>
 
               <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl flex items-start space-x-2">
-                <ShieldCheck className="h-4 w-4 text-indigo-650 shrink-0 mt-0.5" />
+                <ShieldCheck className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
                 <p className="text-[10px] text-indigo-900 leading-normal">
                   <strong>Pago al llegar:</strong> No requerimos tarjeta de crédito para reservar en línea. Tu reserva está garantizada hasta las 18:00 del día de llegada.
                 </p>
@@ -474,7 +474,7 @@ export default function PublicBookingPage() {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-indigo-650 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow"
               >
                 Confirmar Reserva
               </button>
@@ -582,7 +582,7 @@ export default function PublicBookingPage() {
                   }}
                   className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col sm:flex-row gap-4 bg-white ${
                     isSelected
-                      ? 'border-indigo-650 ring-2 ring-indigo-50 shadow-md'
+                      ? 'border-indigo-600 ring-2 ring-indigo-50 shadow-md'
                       : 'border-slate-100 hover:border-slate-200 hover:shadow-sm'
                   }`}
                 >
