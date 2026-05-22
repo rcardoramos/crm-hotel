@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useApp, HotelNotification } from '@/context/AppContext';
@@ -21,7 +21,9 @@ import {
   Info,
   CheckCircle,
   HelpCircle,
-  FileText
+  FileText,
+  LogOut,
+  User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -39,7 +41,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     notifications,
     clearNotification,
     clearAllNotifications,
-    rooms
+    rooms,
+    isLoggedIn,
+    isInitialized,
+    logout,
+    userRole
   } = useApp();
 
   const pathname = usePathname();
@@ -47,6 +53,32 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [showSedeDropdown, setShowSedeDropdown] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (isInitialized) {
+      if (!isLoggedIn) {
+        router.push('/login');
+      } else {
+        // Enforce route security based on logged-in role
+        if (pathname === '/dashboard' && userRole !== 'admin') {
+          router.push(userRole === 'housekeeping' ? '/housekeeping' : '/reception');
+        } else if (pathname === '/reception' && userRole === 'housekeeping') {
+          router.push('/housekeeping');
+        }
+      }
+    }
+  }, [isLoggedIn, isInitialized, userRole, pathname, router]);
+
+  if (!isInitialized || !isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-10 w-10 border-4 border-indigo-650 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm font-medium text-slate-500">Cargando PMS...</p>
+        </div>
+      </div>
+    );
+  }
 
   const navigation = [
     { name: 'Mapa de Habitaciones', href: '/reception', icon: Bed, roles: ['reception', 'admin'] },
@@ -203,6 +235,19 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               ))}
             </div>
           </div>
+
+          <div className="pt-4 border-t border-slate-100 mt-2 px-3">
+            <button
+              onClick={() => {
+                logout();
+                router.push('/login');
+              }}
+              className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 transition-all group cursor-pointer"
+            >
+              <LogOut className="h-5 w-5 shrink-0 text-rose-500 group-hover:text-rose-600" />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
         </nav>
 
         {/* Demo Mode Badge */}
@@ -237,47 +282,53 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           {/* Quick Role Switcher Header & Alerts */}
           <div className="flex items-center space-x-4">
             {/* Role quick switch tabs */}
-            <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-medium border border-slate-150">
-              <button
-                onClick={() => {
-                  setActiveRole('reception');
-                  router.push('/reception');
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activeRole === 'reception'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Recepción
-              </button>
-              <button
-                onClick={() => {
-                  setActiveRole('admin');
-                  router.push('/dashboard');
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activeRole === 'admin'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Admin
-              </button>
-              <button
-                onClick={() => {
-                  setActiveRole('housekeeping');
-                  router.push('/housekeeping');
-                }}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activeRole === 'housekeeping'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Limpieza
-              </button>
-            </div>
+            {userRole !== 'housekeeping' && (
+              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-medium border border-slate-150">
+                <button
+                  onClick={() => {
+                    setActiveRole('reception');
+                    router.push('/reception');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    activeRole === 'reception'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Recepción
+                </button>
+                
+                {userRole === 'admin' && (
+                  <button
+                    onClick={() => {
+                      setActiveRole('admin');
+                      router.push('/dashboard');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg transition-all ${
+                      activeRole === 'admin'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Admin
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setActiveRole('housekeeping');
+                    router.push('/housekeeping');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    activeRole === 'housekeeping'
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Limpieza
+                </button>
+              </div>
+            )}
 
             {/* Notification Center */}
             <div className="relative">
@@ -455,6 +506,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   </div>
                   <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
                 </Link>
+
+                <div className="pt-4 border-t border-slate-100 mt-4">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      logout();
+                      router.push('/login');
+                    }}
+                    className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+                  >
+                    <LogOut className="h-5 w-5 shrink-0 text-rose-500" />
+                    <span>Cerrar Sesión</span>
+                  </button>
+                </div>
               </nav>
 
               <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-center">

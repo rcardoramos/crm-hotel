@@ -37,10 +37,15 @@ interface AppContextType {
   bookings: Booking[];
   notifications: HotelNotification[];
   activeRole: 'admin' | 'reception' | 'housekeeping';
+  isLoggedIn: boolean;
+  isInitialized: boolean;
+  userRole: 'admin' | 'reception' | 'housekeeping' | null;
   
   // Sede & Role setters
   setCurrentSede: (sede: Sede) => void;
   setActiveRole: (role: 'admin' | 'reception' | 'housekeeping') => void;
+  login: (username: string, pass: string) => boolean;
+  logout: () => void;
   
   // Core Business Actions
   checkIn: (
@@ -90,7 +95,86 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [notifications, setNotifications] = useState<HotelNotification[]>([]);
-  const [activeRole, setActiveRole] = useState<'admin' | 'reception' | 'housekeeping'>('reception');
+  const [activeRole, setActiveRoleState] = useState<'admin' | 'reception' | 'housekeeping'>('reception');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [userRole, setUserRole] = useState<'admin' | 'reception' | 'housekeeping' | null>(null);
+
+  // Helper to load notifications with auto-generation for housekeeping
+  const loadNotificationsForRole = (role: 'admin' | 'reception' | 'housekeeping') => {
+    if (typeof window === 'undefined') return;
+    const notifKey = `hotelflow_notifications_${role}`;
+    const savedNotifs = localStorage.getItem(notifKey);
+    let loadedList: HotelNotification[] = [];
+    if (savedNotifs) {
+      try {
+        loadedList = JSON.parse(savedNotifs);
+      } catch (e) {
+        loadedList = [];
+      }
+    }
+    
+    let listChanged = false;
+    
+    // Auto-generate notification for housekeeping if a room is in 'Limpieza' but not notified yet,
+    // and clear completed cleanings from the list.
+    if (role === 'housekeeping') {
+      const roomsList = localDB.getRooms();
+      
+      // 1. Filter out stale cleaning notifications for rooms that are no longer dirty
+      const filteredList = loadedList.filter((n) => {
+        if (!n.roomNumber) return true;
+        const r = roomsList.find((rm) => rm.number === n.roomNumber);
+        if (!r) return true;
+        
+        const isCleaningNotif =
+          n.title.toLowerCase().includes('limpieza') ||
+          n.title.toLowerCase().includes('sucia') ||
+          n.message.toLowerCase().includes('limpieza') ||
+          n.message.toLowerCase().includes('sucia');
+          
+        if (r.status !== 'Limpieza' && isCleaningNotif) {
+          listChanged = true;
+          return false; // remove
+        }
+        return true; // keep
+      });
+      
+      loadedList = filteredList;
+      
+      // 2. Auto-generate notification for rooms that are in 'Limpieza' and not yet in the list
+      roomsList.forEach((r) => {
+        if (r.status === 'Limpieza') {
+          const alreadyNotified = loadedList.some((n) =>
+            n.roomNumber === r.number &&
+            (n.title.toLowerCase().includes('limpieza') ||
+              n.title.toLowerCase().includes('sucia') ||
+              n.message.toLowerCase().includes('limpieza') ||
+              n.message.toLowerCase().includes('sucia'))
+          );
+          if (!alreadyNotified) {
+            const newNotif: HotelNotification = {
+              id: `notif-auto-${r.number}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              type: 'warning',
+              title: 'Habitación Sucia (Requiere Limpieza)',
+              message: `La Habitación ${r.number} se encuentra en estado 'Limpieza' y requiere atención.`,
+              roomNumber: r.number,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+              read: false,
+            };
+            loadedList = [newNotif, ...loadedList];
+            listChanged = true;
+          }
+        }
+      });
+      
+      if (listChanged) {
+        localStorage.setItem(notifKey, JSON.stringify(loadedList));
+      }
+    }
+    
+    setNotifications(loadedList);
+  };
 
   // Load from localDB simulator
   const refreshState = () => {
@@ -111,6 +195,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setConsumptions(localDB.getConsumptions());
     setIncidents(localDB.getIncidents());
     setBookings(localDB.getBookings());
+
+    // Load auth status
+    if (typeof window !== 'undefined') {
+      const loggedIn = sessionStorage.getItem('hotelflow_logged_in') === 'true';
+      const savedRole = (sessionStorage.getItem('hotelflow_active_role') || 'reception') as 'admin' | 'reception' | 'housekeeping';
+      const savedUserRole = sessionStorage.getItem('hotelflow_user_role') as any;
+      setIsLoggedIn(loggedIn);
+      setActiveRoleState(savedRole);
+      setUserRole(savedUserRole || null);
+      setIsInitialized(true);
+
+      loadNotificationsForRole(savedRole);
+    }
   };
 
   useEffect(() => {
@@ -135,12 +232,71 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Here we can simulate it by seeding if needed or keeping standard state
   };
 
+  const setActiveRole = (role: 'admin' | 'reception' | 'housekeeping') => {
+    setActiveRoleState(role);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('hotelflow_active_role', role);
+      loadNotificationsForRole(role);
+    }
+  };
+
+  const login = (username: string, pass: string): boolean => {
+    let role: 'admin' | 'reception' | 'housekeeping' | null = null;
+    
+    if (username === 'admin' && pass === 'admin123') {
+      role = 'admin';
+    } else if (username === 'reception' && pass === 'recep123') {
+      role = 'reception';
+    } else if (username === 'housekeeping' && pass === 'clean123') {
+      role = 'housekeeping';
+    }
+    
+    if (role) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('hotelflow_logged_in', 'true');
+        sessionStorage.setItem('hotelflow_active_role', role);
+        sessionStorage.setItem('hotelflow_user_role', role);
+        
+        loadNotificationsForRole(role);
+      }
+      setIsLoggedIn(true);
+      setUserRole(role);
+      setActiveRoleState(role);
+      pushNotification(
+        'success',
+        'Sesión Iniciada',
+        `Bienvenido al panel como ${role === 'admin' ? 'Administrador' : role === 'reception' ? 'Recepcionista' : 'Limpieza'}`,
+        undefined,
+        [role]
+      );
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    const previousRole = activeRole;
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('hotelflow_logged_in');
+      sessionStorage.removeItem('hotelflow_active_role');
+      sessionStorage.removeItem('hotelflow_user_role');
+    }
+    setIsLoggedIn(false);
+    setUserRole(null);
+    setActiveRoleState('reception');
+    
+    loadNotificationsForRole('reception');
+    
+    pushNotification('info', 'Sesión Cerrada', 'Has cerrado tu sesión en el PMS.', undefined, [previousRole]);
+  };
+
   // Push notifications helper
   const pushNotification = (
     type: HotelNotification['type'],
     title: string,
     message: string,
-    roomNumber?: string
+    roomNumber?: string,
+    targetRoles: Array<'admin' | 'reception' | 'housekeeping'> = ['admin', 'reception', 'housekeeping']
   ) => {
     const newNotif: HotelNotification = {
       id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -151,15 +307,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       read: false,
     };
-    setNotifications((prev) => [newNotif, ...prev]);
+    
+    if (typeof window !== 'undefined') {
+      targetRoles.forEach((role) => {
+        const key = `hotelflow_notifications_${role}`;
+        const existing = localStorage.getItem(key);
+        let list: HotelNotification[] = [];
+        if (existing) {
+          try {
+            list = JSON.parse(existing);
+          } catch (e) {
+            list = [];
+          }
+        }
+        const updated = [newNotif, ...list];
+        localStorage.setItem(key, JSON.stringify(updated));
+      });
+    }
+
+    if (targetRoles.includes(activeRole)) {
+      setNotifications((prev) => [newNotif, ...prev]);
+    }
   };
 
   const clearNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifications((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      if (typeof window !== 'undefined') {
+        const key = `hotelflow_notifications_${activeRole}`;
+        localStorage.setItem(key, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   const clearAllNotifications = () => {
     setNotifications([]);
+    if (typeof window !== 'undefined') {
+      const key = `hotelflow_notifications_${activeRole}`;
+      localStorage.setItem(key, JSON.stringify([]));
+    }
   };
 
   // Background monitor: Checks staying timers
@@ -168,7 +355,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (rooms.length === 0 || stays.length === 0) return;
       
       const now = new Date().getTime();
-      let stateUpdated = false;
+
+      // Helper to check if already notified in target role's lists
+      const checkAlreadyNotified = (roomNum: string, textSnippet: string) => {
+        if (typeof window === 'undefined') return false;
+        const key = 'hotelflow_notifications_reception'; // check reception's list
+        const existing = localStorage.getItem(key);
+        if (!existing) return false;
+        try {
+          const list: HotelNotification[] = JSON.parse(existing);
+          return list.some(n => n.roomNumber === roomNum && n.message.includes(textSnippet));
+        } catch (e) {
+          return false;
+        }
+      };
 
       rooms.forEach((room) => {
         if (room.status === 'Ocupada' && room.current_stay_id) {
@@ -180,30 +380,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
             // Trigger Alert if expiring soon (less than 45 minutes)
             if (timeLeftMins <= 45 && timeLeftMins > 44) {
-              const alreadyNotified = notifications.some(
-                (n) => n.roomNumber === room.number && n.message.includes('próxima a vencer')
-              );
+              const alreadyNotified = checkAlreadyNotified(room.number, 'próxima a vencer');
               if (!alreadyNotified) {
                 pushNotification(
                   'warning',
                   'Estadía por vencer',
                   `La estadía de la Habitación ${room.number} vencerá en 45 minutos.`,
-                  room.number
+                  room.number,
+                  ['reception', 'admin']
                 );
               }
             }
 
             // Trigger Alert if expired
             if (timeLeftMins <= 0) {
-              const alreadyNotified = notifications.some(
-                (n) => n.roomNumber === room.number && n.message.includes('vencida')
-              );
+              const alreadyNotified = checkAlreadyNotified(room.number, 'vencida');
               if (!alreadyNotified) {
                 pushNotification(
                   'alert',
                   'Estadía VENCIDA',
                   `La estadía de la Habitación ${room.number} ha vencido. Requiere Check-Out o Extensión.`,
-                  room.number
+                  room.number,
+                  ['reception', 'admin']
                 );
               }
             }
@@ -213,7 +411,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, 10000); // Check every 10 seconds
 
     return () => clearInterval(interval);
-  }, [rooms, stays, notifications]);
+  }, [rooms, stays]);
 
   // --- ACTIONS ---
 
@@ -253,7 +451,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'success',
       'Check-In Exitoso',
       `Habitación ${room?.number} ocupada por ${guest.name} (${durationHours} horas).`,
-      room?.number
+      room?.number,
+      ['reception', 'admin']
     );
     refreshState();
   };
@@ -284,12 +483,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       current_stay_id: null,
     });
 
+    // Notify reception and admin
     pushNotification(
       'info',
       'Check-Out Procesado',
       `Habitación ${room.number} liberada. Cuenta total: S/${finalTotal.toFixed(2)}. Enviada a Limpieza.`,
-      room.number
+      room.number,
+      ['reception', 'admin']
     );
+
+    // Notify cleaning that room is dirty
+    pushNotification(
+      'warning',
+      'Habitación Sucia (Requiere Limpieza)',
+      `La Habitación ${room.number} ha quedado sucia tras el Check-Out. Requiere limpieza.`,
+      room.number,
+      ['housekeeping']
+    );
+
     refreshState();
   };
 
@@ -319,7 +530,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'success',
       'Estadía Extendida',
       `Habitación ${room.number} extendida en +${hoursToAdd} horas (S/${price}).`,
-      room.number
+      room.number,
+      ['reception', 'admin']
     );
     refreshState();
   };
@@ -345,7 +557,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'info',
       'Nuevo Pedido',
       `Pedido recibido en Habitación ${room.number}: ${quantity}x ${product.name}.`,
-      room.number
+      room.number,
+      ['reception', 'admin']
     );
     refreshState();
   };
@@ -365,7 +578,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         'success',
         'Pedido Entregado',
         `Entregado en Habitación ${room?.number || '?'}: ${product?.name}.`,
-        room?.number
+        room?.number,
+        ['reception', 'admin']
       );
     }
     refreshState();
@@ -378,7 +592,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'info',
       'Limpieza Solicitada',
       `El huésped de la Habitación ${room.number} ha solicitado limpieza de habitación.`,
-      room.number
+      room.number,
+      ['housekeeping', 'admin', 'reception']
     );
     refreshState();
   };
@@ -391,7 +606,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'info',
       'Limpieza Iniciada',
       `Personal de limpieza ingresó a la Habitación ${room.number}.`,
-      room.number
+      room.number,
+      ['admin', 'reception']
     );
     refreshState();
   };
@@ -406,7 +622,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'success',
       'Habitación Lista',
       `Habitación ${room.number} se encuentra limpia y disponible para asignación.`,
-      room.number
+      room.number,
+      ['reception', 'admin']
     );
     refreshState();
   };
@@ -430,7 +647,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'alert',
       'Incidencia Reportada',
       `Incidencia [${priority.toUpperCase()}] en Habitación ${room?.number}: ${description}`,
-      room?.number
+      room?.number,
+      ['admin', 'reception', 'housekeeping']
     );
     refreshState();
   };
@@ -444,8 +662,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'success',
       'Incidencia Resuelta',
       `Incidencia en Habitación ${room?.number || '?'} marcada como resuelta.`,
-      room?.number
+      room?.number,
+      ['admin', 'reception']
     );
+
+    // If the room was returned to Limpieza status, notify cleaning!
+    if (room && room.status === 'Limpieza') {
+      pushNotification(
+        'warning',
+        'Habitación Sucia (Mantenimiento Finalizado)',
+        `La Habitación ${room.number} ha salido de Mantenimiento y requiere Limpieza.`,
+        room.number,
+        ['housekeeping']
+      );
+    }
     refreshState();
   };
 
@@ -460,14 +690,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'success',
       'Nueva Reserva Web',
       `Reserva confirmada de ${bookingData.name} para Habitación ${type?.name || ''}.`,
-      undefined
+      undefined,
+      ['reception', 'admin']
     );
     refreshState();
     return b;
   };
 
   const updateRoomStatus = (roomId: string, status: Room['status']) => {
+    const roomsCopy = localDB.getRooms();
+    const room = roomsCopy.find((r) => r.id === roomId);
+    const oldStatus = room ? room.status : null;
+
     localDB.updateRoom(roomId, { status });
+
+    if (status === 'Limpieza' && oldStatus !== 'Limpieza' && room) {
+      pushNotification(
+        'warning',
+        'Habitación Sucia (Requiere Limpieza)',
+        `La Habitación ${room.number} requiere limpieza (cambio de estado manual).`,
+        room.number,
+        ['housekeeping']
+      );
+    }
     refreshState();
   };
 
@@ -480,7 +725,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       newVal ? 'warning' : 'info',
       newVal ? 'Modo No Molestar' : 'Modo Estándar',
       `Habitación ${room.number} activó '${newVal ? 'No Molestar' : 'Disponible para servicios'}'.`,
-      room.number
+      room.number,
+      ['reception', 'admin', 'housekeeping']
     );
     refreshState();
   };
@@ -528,7 +774,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       'success',
       'Pago Registrado',
       `Se registró el pago de consumos pendientes para la Habitación ${room?.number || '?'}.`,
-      room?.number
+      room?.number,
+      ['reception', 'admin']
     );
     refreshState();
   };
@@ -548,8 +795,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         bookings,
         notifications,
         activeRole,
+        isLoggedIn,
+        isInitialized,
+        userRole,
         setCurrentSede,
         setActiveRole,
+        login,
+        logout,
         checkIn,
         checkOut,
         extendStay,

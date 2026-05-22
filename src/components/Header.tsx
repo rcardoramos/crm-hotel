@@ -3,10 +3,20 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Calendar, Home, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Calendar, Home, ArrowRight, User } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
 
 export default function Header() {
   const pathname = usePathname();
+  const { isLoggedIn, activeRole } = useApp();
+
+  const pmsHref = isLoggedIn
+    ? activeRole === 'admin'
+      ? '/dashboard'
+      : activeRole === 'housekeeping'
+      ? '/housekeeping'
+      : '/reception'
+    : '/login';
 
   const links = [
     { name: 'Inicio', href: '/', icon: Home },
@@ -70,11 +80,11 @@ export default function Header() {
         </nav>
 
         <Link
-          href="/reception"
-          className="inline-flex items-center space-x-1 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100/80 px-4 py-2.5 rounded-xl transition-all border border-indigo-100"
+          href={pmsHref}
+          className="inline-flex items-center justify-center h-10 w-10 text-slate-600 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50/50 rounded-full transition-all border border-slate-100 hover:border-indigo-100"
+          title="Acceso PMS"
         >
-          <span>Acceso PMS</span>
-          <ArrowRight className="h-3.5 w-3.5" />
+          <User className="h-5 w-5" />
         </Link>
       </div>
     </header>
