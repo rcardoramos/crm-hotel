@@ -834,7 +834,7 @@ export default function AdminDashboardPage() {
                               className="w-20 text-center p-1 bg-white border border-slate-200 rounded outline-none text-xs font-semibold"
                             />
                           ) : (
-                            `S/ ${rt.price_6h.toFixed(2)}`
+                            `S/ ${(rt.price_6h || 0).toFixed(2)}`
                           )}
                         </td>
                         <td className="p-4 text-center font-mono font-semibold">
@@ -847,7 +847,7 @@ export default function AdminDashboardPage() {
                               className="w-20 text-center p-1 bg-white border border-slate-200 rounded outline-none text-xs font-semibold"
                             />
                           ) : (
-                            `S/ ${rt.price_12h.toFixed(2)}`
+                            `S/ ${(rt.price_12h || 0).toFixed(2)}`
                           )}
                         </td>
                         <td className="p-4 text-center font-mono font-semibold">
@@ -860,7 +860,7 @@ export default function AdminDashboardPage() {
                               className="w-20 text-center p-1 bg-white border border-slate-200 rounded outline-none text-xs font-semibold"
                             />
                           ) : (
-                            `S/ ${rt.price_24h.toFixed(2)}`
+                            `S/ ${(rt.price_24h || 0).toFixed(2)}`
                           )}
                         </td>
                         <td className="p-4 text-center font-mono font-semibold">
@@ -873,7 +873,7 @@ export default function AdminDashboardPage() {
                               className="w-20 text-center p-1 bg-white border border-slate-200 rounded outline-none text-xs font-semibold"
                             />
                           ) : (
-                            `S/ ${rt.price_custom_hour.toFixed(2)}`
+                            `S/ ${(rt.price_custom_hour || 0).toFixed(2)}`
                           )}
                         </td>
                         <td className="p-4 text-center">

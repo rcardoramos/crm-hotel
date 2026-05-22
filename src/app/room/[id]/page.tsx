@@ -278,7 +278,7 @@ export default function GuestRoomPortal() {
                       >
                         <div className="space-y-1">
                           <span className="font-semibold text-sm text-white block">{product.name}</span>
-                          <span className="text-xs text-indigo-400 font-semibold block">S/ {product.price.toFixed(2)}</span>
+                          <span className="text-xs text-indigo-400 font-semibold block">S/ {(product.price || 0).toFixed(2)}</span>
                           <span className="text-[10px] text-slate-550 block font-medium">Stock disponible: {product.stock}</span>
                           {product.stock <= 3 && product.stock > 0 && (
                             <span className="text-[9px] text-amber-500 font-medium block">Pocas unidades</span>
@@ -334,7 +334,7 @@ export default function GuestRoomPortal() {
                         {stay.room_paid ? 'Pagado' : 'Pendiente'}
                       </span>
                     </div>
-                    <span className="font-semibold text-white">S/ {stay.room_cost.toFixed(2)}</span>
+                    <span className="font-semibold text-white">S/ {(stay.room_cost || 0).toFixed(2)}</span>
                   </div>
                 )}
 
@@ -364,7 +364,7 @@ export default function GuestRoomPortal() {
                             {cons.payment_status === 'paid' ? 'Pagado' : 'Pendiente'}
                           </span>
                         </div>
-                        <span className="font-semibold text-white shrink-0">S/ {(cons.quantity * cons.unit_price).toFixed(2)}</span>
+                        <span className="font-semibold text-white shrink-0">S/ {((cons.quantity * cons.unit_price) || 0).toFixed(2)}</span>
                       </div>
                     );
                   })
@@ -374,29 +374,29 @@ export default function GuestRoomPortal() {
                   <div className="border-t border-slate-900 pt-4 mt-4 space-y-2">
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Subtotal Hospedaje:</span>
-                      <span className="font-medium text-slate-200">S/ {stay.room_cost.toFixed(2)}</span>
+                      <span className="font-medium text-slate-200">S/ {(stay.room_cost || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400">
                       <span>Subtotal Consumos y Extras:</span>
-                      <span className="font-medium text-slate-200">S/ {consumptionsTotal.toFixed(2)}</span>
+                      <span className="font-medium text-slate-200">S/ {(consumptionsTotal || 0).toFixed(2)}</span>
                     </div>
                     
                     <div className="border-t border-slate-800/80 my-2 pt-2.5 space-y-1.5">
                       <div className="flex justify-between text-xs text-emerald-400">
                         <span>Monto Abonado / Pagado:</span>
-                        <span className="font-semibold">S/ {totalPaid.toFixed(2)}</span>
+                        <span className="font-semibold">S/ {(totalPaid || 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-amber-400">
                         <span>Monto Pendiente a Pagar:</span>
                         <span className="font-semibold flex items-center gap-1.5">
-                          S/ {totalPending.toFixed(2)}
+                          S/ {(totalPending || 0).toFixed(2)}
                           {totalPending > 0 && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />}
                         </span>
                       </div>
                       
                       <div className="flex justify-between text-sm font-bold text-white border-t border-slate-800 pt-3 mt-3">
                         <span>Total General (Hospedaje + Extras)</span>
-                        <span className="text-indigo-400 text-base font-extrabold">S/ {totalBill.toFixed(2)}</span>
+                        <span className="text-indigo-400 text-base font-extrabold">S/ {(totalBill || 0).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -471,7 +471,7 @@ export default function GuestRoomPortal() {
                           <span className="font-bold text-white">{qty}x</span>{' '}
                           <span className="text-slate-300">{p.name}</span>
                         </div>
-                        <span className="font-semibold text-indigo-400">S/ {(qty * p.price).toFixed(2)}</span>
+                        <span className="font-semibold text-indigo-400">S/ {((qty * p.price) || 0).toFixed(2)}</span>
                       </div>
                     );
                   })}

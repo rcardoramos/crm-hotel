@@ -78,13 +78,13 @@ export default function PublicBookingPage() {
   } else {
     if (activeRoomType) {
       if (hoursCount <= 6) {
-        subtotal = activeRoomType.price_6h;
+        subtotal = activeRoomType.price_6h || 0;
       } else if (hoursCount <= 12) {
-        subtotal = activeRoomType.price_12h;
+        subtotal = activeRoomType.price_12h || 0;
       } else if (hoursCount <= 24) {
-        subtotal = activeRoomType.price_24h;
+        subtotal = activeRoomType.price_24h || 0;
       } else {
-        subtotal = activeRoomType.price_24h + (hoursCount - 24) * activeRoomType.price_custom_hour;
+        subtotal = (activeRoomType.price_24h || 0) + (hoursCount - 24) * (activeRoomType.price_custom_hour || 0);
       }
     } else {
       subtotal = 0;

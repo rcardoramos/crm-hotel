@@ -100,10 +100,10 @@ export default function ReceptionPage() {
   const getStayCost = (room: Room, hours: number) => {
     const type = roomTypes.find((t) => t.id === room.type_id);
     if (!type) return 0;
-    if (hours <= 6) return type.price_6h;
-    if (hours <= 12) return type.price_12h;
-    if (hours <= 24) return type.price_24h;
-    return type.price_24h + (hours - 24) * type.price_custom_hour;
+    if (hours <= 6) return type.price_6h || 0;
+    if (hours <= 12) return type.price_12h || 0;
+    if (hours <= 24) return type.price_24h || 0;
+    return (type.price_24h || 0) + (hours - 24) * (type.price_custom_hour || 0);
   };
 
   const currentDurationHours = getDurationHours();
@@ -123,19 +123,19 @@ export default function ReceptionPage() {
     : [];
 
   const consumptionsTotal = activeConsumptions.reduce(
-    (acc, c) => acc + c.quantity * c.unit_price,
+    (acc, c) => acc + (c.quantity || 0) * (c.unit_price || 0),
     0
   );
 
   // Bill calculations for payment desegregation
   const pendingConsumptionsCost = activeConsumptions
     .filter((c) => c.payment_status !== 'paid')
-    .reduce((acc, c) => acc + c.quantity * c.unit_price, 0);
+    .reduce((acc, c) => acc + (c.quantity || 0) * (c.unit_price || 0), 0);
 
-  const roomPendingCost = (activeStay && !activeStay.room_paid) ? activeStay.room_cost : 0;
+  const roomPendingCost = (activeStay && !activeStay.room_paid) ? (activeStay.room_cost || 0) : 0;
   const totalPending = roomPendingCost + pendingConsumptionsCost;
-  const totalPaid = activeStay ? activeStay.total_paid : 0;
-  const totalBill = activeStay ? (activeStay.room_cost + consumptionsTotal) : 0;
+  const totalPaid = activeStay ? (activeStay.total_paid || 0) : 0;
+  const totalBill = activeStay ? ((activeStay.room_cost || 0) + consumptionsTotal) : 0;
 
   // Real-time ticking remaining hours for rendering
   const [timeTicker, setTimeTicker] = useState(new Date().getTime());
@@ -681,7 +681,7 @@ export default function ReceptionPage() {
                       <div className="flex items-center justify-between">
                         <div className="text-left">
                           <span className="text-[10px] text-slate-400 font-bold block">TARIFA CALCULADA</span>
-                          <span className="text-xl font-bold text-slate-900">S/ {calculatedRoomCost.toFixed(2)}</span>
+                          <span className="text-xl font-bold text-slate-900">S/ {(calculatedRoomCost || 0).toFixed(2)}</span>
                         </div>
                         <button
                           type="submit"
@@ -839,7 +839,7 @@ export default function ReceptionPage() {
                                           </span>
                                         </div>
                                         <div className="flex items-center space-x-3">
-                                          <span className="font-semibold text-slate-800">S/ {(cons.quantity * cons.unit_price).toFixed(2)}</span>
+                                          <span className="font-semibold text-slate-800">S/ {((cons.quantity * cons.unit_price) || 0).toFixed(2)}</span>
                                           <button
                                             onClick={() => deliverOrder(cons.id)}
                                             className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold transition-all shadow-sm flex items-center space-x-1"
@@ -883,7 +883,7 @@ export default function ReceptionPage() {
                                           </span>
                                         </div>
                                         <div className="flex items-center space-x-3">
-                                          <span className="font-medium text-slate-500">S/ {(cons.quantity * cons.unit_price).toFixed(2)}</span>
+                                          <span className="font-medium text-slate-500">S/ {((cons.quantity * cons.unit_price) || 0).toFixed(2)}</span>
                                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800">
                                             ✓ Despachado
                                           </span>
@@ -905,7 +905,7 @@ export default function ReceptionPage() {
                         <div className="flex justify-between text-xs text-slate-600">
                           <span>Hospedaje ({activeStay.duration_hours} Horas):</span>
                           <div className="flex items-center space-x-1.5">
-                            <span className="font-semibold text-slate-800">S/ {activeStay.room_cost.toFixed(2)}</span>
+                            <span className="font-semibold text-slate-800">S/ {(activeStay.room_cost || 0).toFixed(2)}</span>
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${
                               activeStay.room_paid
                                 ? 'bg-emerald-100 text-emerald-800'
@@ -918,7 +918,7 @@ export default function ReceptionPage() {
                         <div className="flex justify-between text-xs text-slate-600">
                           <span>Consumos y Extras:</span>
                           <div className="flex items-center space-x-1.5">
-                            <span className="font-semibold text-slate-800">S/ {consumptionsTotal.toFixed(2)}</span>
+                            <span className="font-semibold text-slate-800">S/ {(consumptionsTotal || 0).toFixed(2)}</span>
                             {consumptionsTotal > 0 && (
                               <span className="text-[9px] text-slate-500 font-medium">
                                 ({activeConsumptions.filter(c => c.payment_status === 'paid').length} de {activeConsumptions.length} pagados)
@@ -929,18 +929,18 @@ export default function ReceptionPage() {
                         <div className="border-t border-slate-200/60 my-2 pt-2 space-y-1">
                           <div className="flex justify-between text-xs text-emerald-750 font-semibold">
                             <span>Monto Pagado:</span>
-                            <span>S/ {totalPaid.toFixed(2)}</span>
+                            <span>S/ {(totalPaid || 0).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-xs text-amber-700 font-semibold">
                             <span>Monto Pendiente:</span>
                             <span className="flex items-center gap-1.5">
-                              S/ {totalPending.toFixed(2)}
+                              S/ {(totalPending || 0).toFixed(2)}
                               {totalPending > 0 && <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm font-bold text-slate-900 border-t border-slate-200 pt-2.5 mt-2">
                             <span>Total General (Acumulado):</span>
-                            <span className="text-indigo-650 font-bold">S/ {totalBill.toFixed(2)}</span>
+                            <span className="text-indigo-650 font-bold">S/ {(totalBill || 0).toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
@@ -1026,7 +1026,7 @@ export default function ReceptionPage() {
                               .filter((p) => p.stock > 0)
                               .map((p) => (
                                 <option key={p.id} value={p.id}>
-                                  {p.name} (S/ {p.price.toFixed(2)}) - {p.stock} u
+                                  {p.name} (S/ {(p.price || 0).toFixed(2)}) - {p.stock} u
                                 </option>
                               ))}
                           </select>
@@ -1120,7 +1120,7 @@ export default function ReceptionPage() {
                           className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 shadow-sm"
                         >
                           <span>💳</span>
-                          <span>Registrar Pago de Extras (S/ {totalPending.toFixed(2)})</span>
+                          <span>Registrar Pago de Extras (S/ {(totalPending || 0).toFixed(2)})</span>
                         </button>
                       </div>
                     )}

@@ -396,6 +396,46 @@ class LocalDB {
       this.set('incidents', SEED_INCIDENTS);
       this.set('bookings', SEED_BOOKINGS);
       this.set('initialized', true);
+    } else {
+      // Migration / Upgrade for existing installations:
+      // Ensure all SEED_ROOM_TYPES exist in localStorage
+      const existingTypes = this.getRoomTypes();
+      let updatedTypes = false;
+      SEED_ROOM_TYPES.forEach((seedType) => {
+        if (!existingTypes.some((t) => t.id === seedType.id)) {
+          existingTypes.push(seedType);
+          updatedTypes = true;
+        }
+      });
+      if (updatedTypes) {
+        this.set('room_types', existingTypes);
+      }
+
+      // Ensure all SEED_ROOMS exist in localStorage
+      const existingRooms = this.getRooms();
+      let roomsUpdated = false;
+      SEED_ROOMS('sede-1').forEach((seedRoom) => {
+        if (!existingRooms.some((r) => r.id === seedRoom.id || r.number === seedRoom.number)) {
+          existingRooms.push(seedRoom);
+          roomsUpdated = true;
+        }
+      });
+      if (roomsUpdated) {
+        this.set('rooms', existingRooms);
+      }
+      
+      // Ensure all SEED_PRODUCTS exist in localStorage
+      const existingProducts = this.getProducts();
+      let productsUpdated = false;
+      SEED_PRODUCTS('sede-1').forEach((seedProduct) => {
+        if (!existingProducts.some((p) => p.id === seedProduct.id)) {
+          existingProducts.push(seedProduct);
+          productsUpdated = true;
+        }
+      });
+      if (productsUpdated) {
+        this.set('products', existingProducts);
+      }
     }
   }
 
