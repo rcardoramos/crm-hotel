@@ -37,6 +37,7 @@ create table habitaciones (
   type_id uuid references tipos_habitacion(id) on delete restrict,
   status varchar not null check (status in ('Disponible', 'Reservada', 'Ocupada', 'Limpieza', 'Mantenimiento', 'Fuera de servicio')),
   current_stay_id uuid, -- links to active stay
+  no_disturb boolean default false,
   last_cleaning_at timestamp with time zone,
   last_maintenance_at timestamp with time zone,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -69,8 +70,13 @@ create table estadias (
   payment_method varchar not null,
   companion_name varchar,
   companion_dni varchar,
+  room_cost decimal not null default 0,
+  room_paid boolean not null default true,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Add circular foreign key link for current active stay
+alter table habitaciones add constraint fk_habitaciones_current_stay foreign key (current_stay_id) references estadias(id) on delete set null;
 
 -- 6. Products & Inventory
 create table productos (
@@ -91,6 +97,7 @@ create table consumos (
   quantity integer not null default 1,
   unit_price decimal not null,
   status varchar not null check (status in ('pending', 'delivered')),
+  payment_status varchar not null default 'pending' check (payment_status in ('pending', 'paid')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -113,9 +120,9 @@ create table reservas (
   email varchar not null,
   phone varchar,
   room_type_id uuid references tipos_habitacion(id) on delete restrict,
-  check_in_date date not null,
-  check_out_date date not null,
-  status varchar not null check (status in ('pending', 'confirmed', 'cancelled')),
+  check_in_date timestamp with time zone not null,
+  check_out_date timestamp with time zone not null,
+  status varchar not null check (status in ('pending', 'confirmed', 'cancelled', 'checked_in')),
   total_price decimal not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

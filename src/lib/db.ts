@@ -107,7 +107,7 @@ export interface Booking {
   room_type_id: string;
   check_in_date: string;
   check_out_date: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'checked_in';
   total_price: number;
   created_at: string;
 }
@@ -700,7 +700,7 @@ class LocalDB {
     this.set('bookings', bookings);
     return newBooking;
   }
-  updateBookingStatus(id: string, status: 'pending' | 'confirmed' | 'cancelled'): Booking {
+  updateBookingStatus(id: string, status: 'pending' | 'confirmed' | 'cancelled' | 'checked_in'): Booking {
     const bookings = this.getBookings();
     const idx = bookings.findIndex((b) => b.id === id);
     if (idx !== -1) {

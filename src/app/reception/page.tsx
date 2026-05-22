@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { useApp } from '@/context/AppContext';
-import { Room, Guest, Product } from '@/lib/db';
+import { Room, Guest, Product, Booking } from '@/lib/db';
 import {
   UserPlus,
   LogOut,
@@ -22,7 +22,9 @@ import {
   AlertOctagon,
   Eye,
   Info,
-  Volume2
+  Volume2,
+  CalendarDays,
+  Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -46,12 +48,20 @@ export default function ReceptionPage() {
     resolveIncident,
     toggleNoDisturb,
     activeRole,
-    registerStayPayment
+    registerStayPayment,
+    bookings,
+    updateBookingStatus
   } = useApp();
 
   // Filters
   const [filterFloor, setFilterFloor] = useState<number | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  
+  // Web Bookings States
+  const [showBookingsDrawer, setShowBookingsDrawer] = useState(false);
+  const [selectedBookingForCheckIn, setSelectedBookingForCheckIn] = useState<Booking | null>(null);
+  const [overridePrice, setOverridePrice] = useState<number | null>(null);
+  const [selectedRoomForBooking, setSelectedRoomForBooking] = useState<Record<string, string>>({});
   
   // Selection
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -107,7 +117,9 @@ export default function ReceptionPage() {
   };
 
   const currentDurationHours = getDurationHours();
-  const calculatedRoomCost = selectedRoom ? getStayCost(selectedRoom, currentDurationHours) : 0;
+  const calculatedRoomCost = overridePrice !== null
+    ? overridePrice
+    : (selectedRoom ? getStayCost(selectedRoom, currentDurationHours) : 0);
 
   // Active stay data for selected room
   const activeStay = selectedRoom
@@ -200,6 +212,8 @@ export default function ReceptionPage() {
     setCustomDuration('');
     setPaymentMethod('Efectivo');
     setIsPrepaid(true);
+    setSelectedBookingForCheckIn(null);
+    setOverridePrice(null);
   };
 
   const handleCloseCheckInModal = () => {
@@ -230,6 +244,10 @@ export default function ReceptionPage() {
       companionDni || undefined,
       isPrepaid
     );
+
+    if (selectedBookingForCheckIn) {
+      updateBookingStatus(selectedBookingForCheckIn.id, 'checked_in');
+    }
 
     handleCloseCheckInModal();
   };
@@ -283,6 +301,19 @@ export default function ReceptionPage() {
 
           {/* Floor selector */}
           <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
+            <button
+              onClick={() => setShowBookingsDrawer(true)}
+              className="flex items-center space-x-2 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition relative mr-2"
+            >
+              <CalendarDays className="h-4 w-4" />
+              <span>Reservas Web</span>
+              {bookings.filter(b => b.status === 'confirmed').length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-extrabold text-white shadow-sm ring-2 ring-white animate-pulse">
+                  {bookings.filter(b => b.status === 'confirmed').length}
+                </span>
+              )}
+            </button>
+
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wide">Piso:</span>
             <select
               value={filterFloor}
@@ -446,6 +477,63 @@ export default function ReceptionPage() {
                 </div>
 
                 <form onSubmit={handleCheckInSubmit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
+                  {/* Vincular Reserva Web */}
+                  {bookings.filter(b => b.status === 'confirmed' && b.room_type_id === selectedRoom.type_id).length > 0 && (
+                    <div className="col-span-full bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm mb-2 animate-fade-in">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2 bg-indigo-100 rounded-xl text-indigo-700">
+                          <CalendarDays className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">¿Vincular a una Reserva Web?</span>
+                          <span className="text-[10px] text-slate-500 block">Importa automáticamente los datos del huésped desde su reserva online.</span>
+                        </div>
+                      </div>
+                      <select
+                        value={selectedBookingForCheckIn?.id || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) {
+                            setSelectedBookingForCheckIn(null);
+                            setOverridePrice(null);
+                            resetCheckInForm();
+                          } else {
+                            const booking = bookings.find(b => b.id === val);
+                            if (booking) {
+                              setSelectedBookingForCheckIn(booking);
+                              setOverridePrice(booking.total_price);
+                              setGuestName(booking.name);
+                              setGuestEmail(booking.email);
+                              setGuestPhone(booking.phone);
+                              // Calculate duration
+                              const checkInMs = new Date(booking.check_in_date).getTime();
+                              const checkOutMs = new Date(booking.check_out_date).getTime();
+                              const diffMs = checkOutMs - checkInMs;
+                              const durationHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)));
+                              if (durationHours === 6 || durationHours === 12 || durationHours === 24) {
+                                setStayDuration(durationHours);
+                                setCustomDuration('');
+                              } else {
+                                setStayDuration(-1);
+                                setCustomDuration(durationHours.toString());
+                              }
+                            }
+                          }
+                        }}
+                        className="text-xs font-bold p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-slate-700 min-w-[200px]"
+                      >
+                        <option value="">-- No vincular --</option>
+                        {bookings
+                          .filter(b => b.status === 'confirmed' && b.room_type_id === selectedRoom.type_id)
+                          .map(b => (
+                            <option key={b.id} value={b.id}>
+                              {b.name} - S/ {b.total_price}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
                   {/* Left Column: Guest Data (CRM) */}
                   <div className="space-y-4">
                     <div className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
@@ -1144,6 +1232,205 @@ export default function ReceptionPage() {
                   </div>
                 </div>
               </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* --- DRAWER: WEB BOOKINGS --- */}
+        <AnimatePresence>
+          {showBookingsDrawer && (
+            <div className="fixed inset-0 z-50 overflow-hidden">
+              {/* Backdrop */}
+              <div 
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity" 
+                onClick={() => setShowBookingsDrawer(false)} 
+              />
+              
+              {/* Drawer Container */}
+              <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+                <motion.div
+                  initial={{ x: '100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className="w-screen max-w-md bg-white border-l border-slate-100 shadow-2xl flex flex-col h-full"
+                >
+                  {/* Header */}
+                  <div className="px-6 py-5 bg-slate-50 border-b border-slate-150 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                        <CalendarDays className="h-5 w-5 text-indigo-600" />
+                        Reservas Web Activas
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Gestiona y realiza el ingreso de los huéspedes de la web.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowBookingsDrawer(false)}
+                      className="p-1.5 text-slate-400 hover:text-slate-650 rounded-xl transition"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+
+                  {/* Bookings List */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {bookings.filter(b => b.status === 'confirmed').length === 0 ? (
+                      <div className="text-center py-12 px-4">
+                        <CalendarDays className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                        <h4 className="text-sm font-semibold text-slate-700">No hay reservas web pendientes</h4>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Las reservas que realicen los clientes en el portal web aparecerán aquí en tiempo real.
+                        </p>
+                      </div>
+                    ) : (
+                      bookings
+                        .filter(b => b.status === 'confirmed')
+                        .map((booking) => {
+                          const type = roomTypes.find(t => t.id === booking.room_type_id);
+                          // Find available rooms of this type
+                          const availableRoomsOfType = rooms.filter(
+                            r => r.type_id === booking.room_type_id && r.status === 'Disponible'
+                          );
+                          const chosenRoomId = selectedRoomForBooking[booking.id] || '';
+                          
+                          // Format dates
+                          const checkInDate = new Date(booking.check_in_date);
+                          const checkOutDate = new Date(booking.check_out_date);
+                          
+                          return (
+                            <div
+                              key={booking.id}
+                              className="bg-white border border-slate-150 rounded-2xl p-4 space-y-3.5 shadow-sm hover:shadow-md transition-all"
+                            >
+                              {/* Header info */}
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-100 text-[10px] font-bold text-indigo-700">
+                                    Habitación {type?.name || 'Estándar'}
+                                  </span>
+                                  <h4 className="font-bold text-sm text-slate-900 mt-1">{booking.name}</h4>
+                                </div>
+                                <span className="text-sm font-extrabold text-slate-800">
+                                  S/ {(booking.total_price || 0).toFixed(2)}
+                                </span>
+                              </div>
+
+                              {/* Contact & Date Details */}
+                              <div className="space-y-1.5 text-xs text-slate-650 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                <div className="flex items-center gap-2">
+                                  <Phone className="h-3 w-3 text-slate-400 shrink-0" />
+                                  <a href={`tel:${booking.phone}`} className="hover:underline hover:text-indigo-650">
+                                    {booking.phone}
+                                  </a>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Mail className="h-3 w-3 text-slate-450 shrink-0" />
+                                  <a href={`mailto:${booking.email}`} className="hover:underline hover:text-indigo-650 truncate">
+                                    {booking.email}
+                                  </a>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1 pt-1.5 border-t border-slate-200/50">
+                                  <Clock className="h-3 w-3 text-indigo-500 shrink-0" />
+                                  <span className="font-semibold text-slate-800">
+                                    {checkInDate.toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                                  </span>
+                                  <span className="text-slate-400">al</span>
+                                  <span className="font-semibold text-slate-800">
+                                    {checkOutDate.toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 ml-auto">
+                                    ({Math.max(1, Math.round((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60)))}h)
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Room Assignment section */}
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-450 uppercase tracking-wide block">
+                                  Asignar Habitación Disponible
+                                </label>
+                                {availableRoomsOfType.length === 0 ? (
+                                  <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-xl text-[11px] text-rose-700 font-semibold flex items-center gap-1.5">
+                                    <AlertOctagon className="h-4 w-4 shrink-0" />
+                                    No hay habitaciones {type?.name} disponibles
+                                  </div>
+                                ) : (
+                                  <select
+                                    value={chosenRoomId}
+                                    onChange={(e) => setSelectedRoomForBooking(prev => ({
+                                      ...prev,
+                                      [booking.id]: e.target.value
+                                    }))}
+                                    className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-indigo-500 font-semibold text-slate-800"
+                                  >
+                                    <option value="">-- Seleccionar Habitación --</option>
+                                    {availableRoomsOfType.map(r => (
+                                      <option key={r.id} value={r.id}>
+                                        Habitación {r.number} (Piso {r.floor})
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
+
+                              {/* Actions */}
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`¿Estás seguro de cancelar la reserva de ${booking.name}?`)) {
+                                      updateBookingStatus(booking.id, 'cancelled');
+                                    }
+                                  }}
+                                  className="flex-1 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-650 rounded-xl text-xs font-semibold transition"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  disabled={!chosenRoomId}
+                                  onClick={() => {
+                                    const rm = rooms.find(r => r.id === chosenRoomId);
+                                    if (rm) {
+                                      // Pre-fill Check-in form
+                                      setSelectedRoom(rm);
+                                      setSelectedBookingForCheckIn(booking);
+                                      setOverridePrice(booking.total_price);
+                                      setGuestName(booking.name);
+                                      setGuestEmail(booking.email);
+                                      setGuestPhone(booking.phone);
+                                      
+                                      // Calculate duration
+                                      const checkInMs = new Date(booking.check_in_date).getTime();
+                                      const checkOutMs = new Date(booking.check_out_date).getTime();
+                                      const diffMs = checkOutMs - checkInMs;
+                                      const durationHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)));
+                                      
+                                      if (durationHours === 6 || durationHours === 12 || durationHours === 24) {
+                                        setStayDuration(durationHours);
+                                        setCustomDuration('');
+                                      } else {
+                                        setStayDuration(-1);
+                                        setCustomDuration(durationHours.toString());
+                                      }
+                                      
+                                      // Open check-in modal and close drawer
+                                      setShowCheckInModal(true);
+                                      setShowBookingsDrawer(false);
+                                    }
+                                  }}
+                                  className="flex-1.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition shadow-sm"
+                                >
+                                  Asignar & Check-In
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+                </motion.div>
+              </div>
             </div>
           )}
         </AnimatePresence>

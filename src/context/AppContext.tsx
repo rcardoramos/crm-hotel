@@ -79,6 +79,7 @@ interface AppContextType {
   updateRoomType: (typeId: string, updates: Partial<RoomType>) => void;
   addProduct: (productData: Omit<Product, 'id' | 'created_at'>) => void;
   registerStayPayment: (stayId: string) => void;
+  updateBookingStatus: (id: string, status: Booking['status']) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -697,6 +698,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return b;
   };
 
+  const updateBookingStatus = (id: string, status: Booking['status']) => {
+    localDB.updateBookingStatus(id, status);
+    const b = localDB.getBookings().find((bk) => bk.id === id);
+    if (status === 'cancelled') {
+      pushNotification(
+        'info',
+        'Reserva Cancelada',
+        `La reserva de ${b?.name || ''} ha sido cancelada.`,
+        undefined,
+        ['reception', 'admin']
+      );
+    } else if (status === 'checked_in') {
+      pushNotification(
+        'success',
+        'Reserva Procesada',
+        `Check-In de reserva registrado para ${b?.name || ''}.`,
+        undefined,
+        ['reception', 'admin']
+      );
+    }
+    refreshState();
+  };
+
   const updateRoomStatus = (roomId: string, status: Room['status']) => {
     const roomsCopy = localDB.getRooms();
     const room = roomsCopy.find((r) => r.id === roomId);
@@ -824,6 +848,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateRoomType,
         addProduct,
         registerStayPayment,
+        updateBookingStatus,
       }}
     >
       {children}
